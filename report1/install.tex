@@ -1,0 +1,74 @@
+\newpage
+\section{Инсталляция инструментальной среды}
+
+Установка VirtualBox возможна из репозиториев ubuntu либо из репозиториев Oracle.
+
+\textbf{Из репозиториев ubuntu}
+
+Для установки необходимо в терминале набрать следующую команду:
+
+\begin{Verbatim}[frame=single]
+sudo apt-get install virtualbox
+\end{Verbatim}
+
+Для продолжения операции у Вас будет запрошен пароль, введите Ваш пароль и ждите пока закончится загрузка и установка приложения.
+
+\textbf{Из репозиториев Oracle}
+
+Версию VirtualBox можно установить с официального репозитория Oracle. На нём находятся более новые версии.
+
+Для добавления репозитория нужно воспользоваться терминалом.
+
+Необходимо добавить официальный репозиторий VirtualBox в файл /etc/apt/sources.list . Для этого выполните команду:
+
+\begin{Verbatim}[frame=single]
+echo "deb http://download.virtualbox.org/virtualbox/debian \
+ $(lsb_release -sc) contrib" | sudo tee -a /etc/apt/sources.list
+\end{Verbatim}
+
+Добавим и зарегистрируем в системе ключ репозитория с помощью команды в терминал:
+
+\begin{Verbatim}[frame=single]
+wget -q https://www.virtualbox.org/download/oracle_vbox.asc -O- | \
+                                                          sudo apt-key add -
+\end{Verbatim}
+
+Вы должны увидеть примерно следующий текст в Источниках приложений в „Аутентификации”:
+
+\begin{Verbatim}[frame=single]
+7B0F AB3A 13B9 0743 5925  D9C9 5442 2A4B 98AB 5139
+Oracle Corporation (VirtualBox archive signing key) <info@virtualbox.org>
+\end{Verbatim}
+
+Обновите список пакетов:
+
+\begin{Verbatim}[frame=single]
+sudo apt-get update
+\end{Verbatim}
+
+Устанавливаем пакет для модулей ядра таких как vboxdrv и vboxnetflt:
+
+\begin{Verbatim}[frame=single]
+sudo apt-get install dkms
+\end{Verbatim}
+
+Для установки VirtualBox введите:
+
+\begin{Verbatim}[frame=single]
+sudo apt-get install virtualbox-4.3
+\end{Verbatim}
+
+Если нужна более старая версия: замените virtualbox-4.3 на:
+
+\begin{Verbatim}[frame=single]
+virtualbox-4.2 для установки VirtualBox 4.2.20
+virtualbox-4.1 для установки VirtualBox 4.1.28
+\end{Verbatim}
+
+После того как VirtualBox установится, вам нужно добавить вашего пользователя в группу vboxusers. Для этого выполните команду в терминале:
+
+\begin{Verbatim}[frame=single]
+sudo usermod -a -G vboxusers `whoami`
+\end{Verbatim}
+
+Для применения изменений необходимо завершить сеанс и повторить вход в систему, либо перезагрузиться.
