@@ -1,0 +1,172 @@
+\documentclass[a4paper, 12pt]{article}		% general format
+
+%%%% Charset
+\usepackage{cmap}							% make PDF files searchable and copyable
+\usepackage[utf8x]{inputenc}				% accept different input encodings
+\usepackage[T2A]{fontenc}					% russian font
+\usepackage[russian]{babel}					% multilingual support (T2A)
+
+%%%% Graphics
+\usepackage[dvipsnames]{xcolor}			% driver-independent color extensions
+\usepackage{graphicx}						% enhanced support for graphics
+\usepackage{wrapfig}						% produces figures which text can flow around
+
+%%%% Math
+\usepackage{amsmath}						% American Mathematical Society (AMS) math facilities
+\usepackage{amsfonts}						% fonts from the AMS
+\usepackage{amssymb}						% additional math symbols
+
+%%%% Typograpy (don't forget about cm-super)
+\usepackage{microtype}						% subliminal refinements towards typographical perfection
+\linespread{1.3}							% line spacing
+\usepackage[left=2.5cm, right=1.5cm, top=2.5cm, bottom=2.5cm]{geometry}
+\setlength{\parindent}{0pt}					% we don't want any paragraph indentation
+\usepackage{parskip}						% some distance between paragraphs
+
+%%%% Tables
+\usepackage{tabularx}						% tables with variable width columns
+\usepackage{multirow}						% for tabularx
+\usepackage{hhline}							% for tabularx
+
+%%%% Graph
+\usepackage{tikz}							% package for creating graphics programmatically
+\usetikzlibrary{arrows}						% edges for tikz
+
+%%%% Other
+\usepackage{url}							% verbatim with URL-sensitive line breaks
+\usepackage{fancyvrb}						% sophisticated verbatim text (with box)
+%------------------------------------------------------------------------------
+
+\begin{document}
+
+\input{titlepage}
+
+\textbf{Введение}
+
+Проект GNS3 является самым популярным решением для эмуляции сетевого оборудования. На данный момент это графический эмулятор сети, который позволяет смоделировать виртуальную сеть из маршрутизаторов и виртуальных машин.
+
+\textbf{Установка}
+
+Установить GNS3 можно с официального сайта - \url{http://www.gns3.com/}. Для deb-like систем (Debian, Ubuntu, Mint) GNS3 доступен прямо из репозитория.
+
+\begin{Verbatim}[frame=single]
+apt-get install gns3
+\end{Verbatim}
+
+Первый запуск программы сопровождается появлением окна c мастером установки, состоящим из трёх шагов:
+\begin{enumerate}
+  \item указание путей к образом ОС;
+  \item проверка корректности путей из шага 1;
+  \item добавление образов IOS.
+\end{enumerate}
+
+Перейдём к добавлению образов IOS. Их можно легко найти в интернете, на момент написания работы богатый выбор представлен на сайте \url{http://certs4u.info/ciscoios/c2650/c2691/}. Диалог добавления образа находится в меню Edit, пункт IOS images and hypervisors. Мы используем файл c2691-adventerprisek9\_sna-mz.124-13b.bin, а система автоматически определяет модель маршрутизатора 
+
+Теперь можно подключиться к работающему роутеру. Для подключения, нужно набрать следующую команду, после чего появится доступ к управлению роутером.
+\begin{Verbatim}[frame=single]
+telnet 127.0.0.1 2101
+\end{Verbatim}
+
+\textbf{Виртуальные машины в эмулируемой сети}
+
+GNS3 можно соединить с хостовой ОС Linux (на котором он запущен) и серверами в VirtualBox-е. Для реализации этой схемы подключения, произведём установку утилиты tunctl для создания и управления TUN/TAP виртуальными сетевыми интерфейсами:
+
+\begin{Verbatim}[frame=single]
+ubox$ sudo apt-get install -y uml-utilities
+\end{Verbatim}
+
+И утилиту brctl для создания и настройки сетевых мостов:
+\begin{Verbatim}[frame=single]
+ubox$ sudo apt-get install -y bridge-utils
+\end{Verbatim}
+
+Теперь создаем и конфигурируем виртуальные сетевые интерфейсы:
+\begin{itemize}
+\item tap0 -- для связи с Linux-ом, на котором и запущен GNS3.
+\item tap1 -- для связи через мост с гостевыми машинами VirtualBox-а.
+\end{itemize}
+\begin{Verbatim}[frame=single]
+ubox$ sudo tunctl -t tap0 -u username
+ubox$ sudo tunctl -t tap1 -u username
+ubox$ sudo ip addr add 192.168.1.1/24 dev tap0
+ubox$ sudo ip link set up dev tap0
+\end{Verbatim}
+
+Обеспечим привязку интерфейсов к облаку. Связь с VirtualBox-ом осуществляется через мост br0, который состоит из виртуального Host-only интерфейса vboxnet0 и уже созданного tap1.
+\begin{Verbatim}[frame=single]
+ubox$ sudo brctl addbr br0
+ubox$ sudo brctl addif br0 tap1
+ubox$ sudo brctl addif br0 vboxnet0
+ubox$ sudo ifconfig br0 192.168.3.4 netmask 255.255.255.0 up
+\end{Verbatim}
+
+Для связи всего этого хозяйства c хостовым Linux-ом на нем необходимо прописать маршрутизацию в используемые подсети:
+\begin{Verbatim}[frame=single]
+ubox$ sudo route add -net 10.1.1.0/24 gw 192.168.1.1
+ubox$ sudo route add -net 10.2.2.0/24 gw 192.168.1.1
+ubox$ sudo route add -net 192.168.3.0/24 gw 192.168.1.1
+\end{Verbatim}
+
+Теперь перейдём к настройке роутеров. На всех роутерах нужно прописать роутинг на подсети (или использовать протоколы динамической маршрутизации).
+
+Для R1 --
+
+\begin{Verbatim}[frame=single]
+R1# conf t
+R1(config)# router eigrp 1
+R1(config-router)# passive-interface FastEthernet0/0
+R1(config-router)# network 10.1.1.0 0.0.0.3
+R1(config-router)# network 192.168.1.0
+R1(config-router)# no auto-summary
+R1(config-router)# exit
+R1(config)# ip route 0.0.0.0 0.0.0.0 FastEthernet0/0
+\end{Verbatim}
+
+Для R2 --
+
+\begin{Verbatim}[frame=single]
+R2# conf t
+R2(config)# router eigrp 1
+R2(config-router)# network 10.1.1.0 0.0.0.3
+R2(config-router)# network 10.2.2.0 0.0.0.3
+R2(config-router)# no auto-summary
+R2(config-router)# exit
+R2(config)# ip route 0.0.0.0 0.0.0.0 Serial0/0
+\end{Verbatim}
+
+Для R3 --
+
+\begin{Verbatim}[frame=single]
+R3# conf t
+R3(config)# router eigrp 1
+R3(config-router)# passive-interface FastEthernet0/0
+R3(config-router)# network 10.2.2.0 0.0.0.3
+R3(config-router)# network 192.168.3.0
+R3(config-router)# no auto-summary
+R3(config-router)# exit
+R3(config)# ip route 0.0.0.0 0.0.0.0 Serial0/0
+\end{Verbatim}
+
+На Debian-е (запущенном в VirtualBox) устанавливается сетевой адрес и шлюз по умолчанию:
+\begin{Verbatim}[frame=single]
+debianbox$ ifconfig eth0 192.168.3.3 netmask 255.255.255.0 up
+debianbox$ route add default gw 192.168.3.1
+\end{Verbatim}
+
+Для того, чтобы работал Интернет через хостовый Linux нужно применить следующие правила (eth0 — внешний интерфейс).
+\begin{Verbatim}[frame=single]
+echo 1 > /proc/sys/net/ipv4/ip_forward
+ubox$ sudo /sbin/iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+ubox$ sudo /sbin/iptables -t nat -A POSTROUTING -o eth0 -j LOG
+ubox$ sudo /sbin/iptables -A FORWARD -i eth0 -o tap0 -m state --state 
+                                             RELATED,ESTABLISHED -j ACCEPT
+ubox$ sudo /sbin/iptables -A FORWARD -i tap0 -o eth0 -j ACCEPT
+\end{Verbatim}
+
+На базе данного примера можно строить сетевые топологии еще больше и сложнее.
+
+\textbf{Заключение}
+
+GNS3 является прекрасным инструментом для проведения лабораторных работ и обучению всем сетевым премудростям Cisco. Данная программа подходит для самостоятельной подготовки к сдаче экзаменов по Cisco -- CCNA, CCNP, CCIP и CCIE.
+
+\end{document}
