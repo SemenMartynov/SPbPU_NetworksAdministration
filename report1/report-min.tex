@@ -1,0 +1,110 @@
+\documentclass[a4paper, 12pt]{article}		% general format
+
+%%%% Charset
+\usepackage{cmap}							% make PDF files searchable and copyable
+\usepackage[utf8x]{inputenc}				% accept different input encodings
+\usepackage[T2A]{fontenc}					% russian font
+\usepackage[russian]{babel}					% multilingual support (T2A)
+
+%%%% Graphics
+\usepackage[dvipsnames]{xcolor}			% driver-independent color extensions
+\usepackage{graphicx}						% enhanced support for graphics
+\usepackage{wrapfig}						% produces figures which text can flow around
+
+%%%% Math
+\usepackage{amsmath}						% American Mathematical Society (AMS) math facilities
+\usepackage{amsfonts}						% fonts from the AMS
+\usepackage{amssymb}						% additional math symbols
+
+%%%% Typograpy (don't forget about cm-super)
+\usepackage{microtype}						% subliminal refinements towards typographical perfection
+\linespread{1.3}							% line spacing
+\usepackage[left=2.5cm, right=1.5cm, top=2.5cm, bottom=2.5cm]{geometry}
+\setlength{\parindent}{0pt}					% we don't want any paragraph indentation
+\usepackage{parskip}						% some distance between paragraphs
+
+%%%% Tables
+\usepackage{tabularx}						% tables with variable width columns
+\usepackage{multirow}						% for tabularx
+\usepackage{hhline}							% for tabularx
+
+%%%% Graph
+\usepackage{tikz}							% package for creating graphics programmatically
+\usetikzlibrary{arrows}						% edges for tikz
+
+%%%% Other
+\usepackage{url}							% verbatim with URL-sensitive line breaks
+\usepackage{fancyvrb}						% sophisticated verbatim text (with box)
+%------------------------------------------------------------------------------
+
+\begin{document}
+
+\input{titlepage}
+
+%------------------------------------------------------------------------------
+
+\textbf{Подготовка тестового стенда}
+
+Тестовый стенд был построен на основе VirtualBox-4.3. Для установки этого продукта в терминале необходимо набрать следующую команду:
+
+\begin{Verbatim}[frame=single]
+sudo apt-get install virtualbox
+\end{Verbatim}
+
+\textbf{Разворачивание ККС}
+
+Эмулируемая ККС имеет три сегмента (подсети):
+\begin{itemize}
+\item VMnet1 (адрес подсети – 192.168.40.0)
+\item VMnet2 (адрес подсети – 192.168.80.0)
+\item VMnet3 (адрес подсети – 192.168.120.0)
+\end{itemize}
+
+Сеть VMnet1 содержит основной многофункциональный сервер ККС (службы DHCP, DNS, Web, Proxy, почтовая, файловая и др.), использующий ОС Linux Mandrake. Сеть VMnet2 представлена хостом под управлением ОС Windows 2k (2000/XP/2003 Server) и имеет двойное назначение – она обеспечивает ККС дополнительным сервером и поддерживает Windows-клиент семейства 2k. Сеть VMnet3 объединяет рабочие станции c ограниченными аппаратными ресурсами, ориентированные на ОС Windows семейства 9x (95/98).
+
+Взаимодействие сегментов ККС осуществляет маршрутизатор, обслуживаемый ОС семейства Unix (FreeBSD), а подключение ККС к внешней сети (Интернет или реальной сети учебной лаборатории) обеспечивает шлюз, реализуемый другой ОС семейства Unix (NetBSD). Каждый представитель подсетей (VMnet1, Vmnet2, VMnet3) имеет один сетевой адаптер, шлюз – два, а маршрутизатор – три сетевых адаптера.
+
+Хост WIN98 (здесь и далее имя хоста формируется от названия гостевой ОС) имеет статический адрес 192.168.120.15, хост LINUX также имеет статический адрес – 192.168.40.32, а хост WIN2000 получает адрес 192.168.80.128 динамически с помощью виртуального сервера DHCP (встроенного по умолчанию в каждый сегмент сети).Более подробные данные о структуре ККС находятся в методическом пособии.
+
+Эти данные задаются через графический интерфейс VirtualBox. Для организации DHCP в сети VMnet2, к сожалению, нет GUI-инструмента, но эта задача решается через командную строку:
+
+\begin{Verbatim}[frame=single]
+VBoxManage dhcpserver add --netname VMnet2 --ip 192.168.40.1 \
+   --netmask 255.255.255.0 --lowerip 192.168.40.32 --enable
+\end{Verbatim}
+
+Удалить этот DHCP-сервер можно командой
+
+\begin{Verbatim}[frame=single]
+VBoxManage dhcpserver remove --netname VMnet2
+\end{Verbatim}
+
+\textbf{Настройка хостов}
+
+В процессе установки, часть машин получило динамические адреса, часть статические (в соответствии со схемой).
+
+Интерес представляет второйсетевой интерфейс NetBSDЮ его конфигурация определена в файле в файл /etc/rc.conf
+\begin{Verbatim}[frame=single]
+ifconfig_wm1="inet 192.168.40.57 netmask 255.255.255.0"
+\end{Verbatim}
+
+Для включения ip-форвардинга, в файл /etc/sysctl.conf нужно добавить строку
+\begin{Verbatim}[frame=single]
+net.inet.ip.forwarding=1
+\end{Verbatim}
+
+Потребовалось настроить некоторые демоны, такие как ipfilter (фаервол работает в режиме полного доступа, т.к. реальные задачи по ограничению доступа должны лежать на машине FreeBSD, выполняющей функции шлюза в локальную сеть) и ipnat (выполняет nat пакетов, предназначенных web-серверу и маскарадинг всех исходящих пакетов).
+
+NetBSD является шлюзом по умолчанию для нескольких хостов, и чтобы система знала куда отвечать, на этой машине нужно добавить два маршрута (один для Win2000 и один для Win98):
+\begin{Verbatim}[frame=single]
+route add -net 192.168.80.0 -netmask 255.255.255.0 192.168.40.2
+route add -net 192.168.120.0 -netmask 255.255.255.0 192.168.40.2
+\end{Verbatim}
+
+Кроме того, на NetBSD ещё нужно включить NAT для сети VMnet2 и VMnet3:
+\begin{Verbatim}[frame=single]
+echo "map wm0 192.168.80.0/24 -> 192.168.32.5/32" >> /etc/ipnat.conf
+echo "map wm0 192.168.120.0/24 -> 192.168.32.5/32" >> /etc/ipnat.conf
+\end{Verbatim}
+
+\end{document}
